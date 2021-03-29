@@ -13,7 +13,7 @@ function createToken (data) {
 
 // 校验token
 function checkLogin(req, res, next) {
-    if (WHITE_LIST.includes(req.url)) {
+    if (WHITE_LIST.includes(req._parsedUrl.pathname)) {
         next();
         return;
     }
@@ -22,7 +22,7 @@ function checkLogin(req, res, next) {
     if (obj) {
         next();
     } else {
-        res.send(401, { message: 'token无效请重新登录' });
+        res.send(401, { message: 'token无效请重新登录', success: false });
     }
 }
 

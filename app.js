@@ -41,6 +41,7 @@ app.use(cors()); // 注入cors模块解决跨域
 //   else next();
 // })
 app.use(checkLogin); // 校验token
+app.use('/weixin', require('./routes/weixin').getToken(knex));
 app.post('/api/login', require('./routes/login').login(knex));
 app.get('/api/user', require('./routes/users').user(knex));
 

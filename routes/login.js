@@ -29,8 +29,8 @@ function login(knex) {
                 if (data[0].password === password) {
                     // 登录成功，签发一个token并返回给前端
                     const token = createToken({ name })
-                    const { password, ...data } = data[0]
-                    res.json({ message: '登录成功', success: true, token, data })
+                    const { password, ...info } = data[0]
+                    res.json({ message: '登录成功', success: true, token, data: info })
                 } else {
                     res.json({ message: '密码错误', success: false })
                 }
