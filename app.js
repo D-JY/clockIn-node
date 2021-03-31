@@ -23,8 +23,12 @@ app.use(express.urlencoded({extended: true }));
 app.use(express.json());
 
 app.use(cors()); // 注入cors模块解决跨域
+
 app.use(checkLogin); // 校验token
-app.use('/weixin', require('./routes/weixin').getToken(knex));
+
+app.use('/weixin', require('./routes/weixin').weixinAuth(knex));
+app.get('/weixin/getOpenId', require('./routes/weixin').getPageToken(knex));
+
 app.post('/api/login', require('./routes/login').login(knex));
 app.get('/api/user', require('./routes/users').user(knex));
 
