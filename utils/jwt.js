@@ -7,13 +7,17 @@ function createToken (data) {
     obj.data = data || {}; // 存入token的数据
     obj.ctime = (new Date()).getTime(); // token的创建时间
     obj.expiresIn = JWT_EXPIRED; //设定的过期时间
-    let token = jwt.sign(obj, PRIVATE_KEY)
+    let token = jwt.sign(obj, PRIVATE_KEY);
     return token;
 }
 
 // 校验token
 function checkLogin(req, res, next) {
-    if (WHITE_LIST.includes(req._parsedUrl.pathname)) {
+    // if (WHITE_LIST.includes(req._parsedUrl.pathname)) {
+    //     next();
+    //     return;
+    // }
+    if (WHITE_LIST.some(val => !!~req._parsedUrl.pathname.indexOf(val))) {
         next();
         return;
     }
