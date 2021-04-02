@@ -1,9 +1,10 @@
 var crypto = require('crypto');
-const { WEIXIN_TOKEN, appID, appsecret } = require('../utils/const');
+const { WEIXIN_TOKEN, appID, appsecret, PRIVATE_KEY } = require('../utils/const');
 let http = require('request');
 const moment = require('moment');
 const jwt = require('jsonwebtoken');
-const { PRIVATE_KEY } = require('../utils/const');
+const fs = require('fs');
+var path = require('path');
 
 // 微信配置URL认证
 function weixinAuth(knex) {
@@ -26,6 +27,55 @@ function weixinAuth(knex) {
     }
 }
 
+// 获取全局token
+function getToken() {
+    const address = path.join(__dirname, '../') + 'data/access_token.json';
+    try {
+        let data = fs.readFileSync(address, 'utf8');
+        // 读取到json文件有内容
+        if (data) {
+            data = JSON.parse(data);
+            console.log(data.ExTime, Date.now(), data.ExTime > Date.now(), '时间');
+            if (data.ExTime > Date.now()) {
+                return { success: true, message: '获取access_token成功', ...data };
+            } else { // token超时
+                return getData();
+            }
+        } else { // 没有内容
+            return getData();
+        }
+    } catch (error) {
+        return { success: false, message: '获取token文件失败' }
+    }
+    
+    async function getData() {
+        const result = await getTokenApi();
+        if (result.access_token) {
+            fs.writeFile(address, JSON.stringify({ ...result, ExTime: Number(Date.now()) + Number(result.expires_in * 60) }), function(err) {
+                err && console.log(err, 'token写入失败');
+            })
+            return { success: true, message: '获取access_token成功', ...result }
+        } else {
+            return { success: false, message: '获取access_token失败', ...result }
+        }
+    }
+}
+
+// 请求微信获取token接口
+function getTokenApi() {
+    const url = `https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=${appID}&secret=${appsecret}`;
+    return new Promise((reslove, reject) => {
+        http.get(url, function(err, data, body) {
+            body = JSON.parse(body);
+            if (body.access_token) {
+                reslove(body);
+            } else {
+                reject(body)
+            }
+        })
+    })
+}
+
 // 获取页面授权token
 function getPageToken(req, res, next) {
     const { code } = req.query;
@@ -34,7 +84,7 @@ function getPageToken(req, res, next) {
         http.get(url, function(err, data, body) {
             body = JSON.parse(body)
             console.log('getPageToken', body)
-            if (body.access_token) {
+            if (body.openid) {
                 reslove(body)
             } else {
                 reject(body)
@@ -47,34 +97,41 @@ function getPageToken(req, res, next) {
 // 获取微信用户信息
 function getWeixinUserInfo(knex) {
     return function(req, res, next) {
-        getPageToken(req, res, next).then(body => {
+        getPageToken(req, res, next).then(async (body) => {
             console.log('getWeixinUserInfo11', body)
-            const url = `https://api.weixin.qq.com/sns/userinfo?access_token=${body.access_token}&openid=${body.openid}&lang=zh_CN`;
-            http.get(url, function(err, data, result) {
-                result = JSON.parse(result)
-                console.log('getWeixinUserInfo', result)
-                if (result.errcode) {
-                    res.json({ success: false, ...result })
-                } else {
-                    console.log(result, 333)
-                    const { openid, unionid, ...userInfo } = result
-                    knex('weixin_user').select().where({ openid: result.openid }).then(row => {
-                        if (row.length <= 0) {
-                            knex('weixin_user').insert({
-                                openid,
-                                userInfo: JSON.stringify(userInfo),
-                                createDate: moment().format('YYYY-MM-DD'),
-                                createTime: moment().format('HH:mm:ss'),
-                                unionid
-                            }).then(rows => {
-                                console.log(rows)
-                            })
-                        }
-                    })
-                    const token = jwt.sign({ openid }, PRIVATE_KEY);
-                    res.json({ success: true, message: '获取微信用户信息成功', token, userInfo })
-                }
-            })
+            const tokenData = await getToken();
+            console.log(tokenData, 'tokenData');
+            if (tokenData.access_token) {
+                const url = `https://api.weixin.qq.com/sns/userinfo?access_token=${tokenData.access_token}&openid=${body.openid}&lang=zh_CN`;
+                http.get(url, function(err, data, result) {
+                    result = JSON.parse(result)
+                    console.log('getWeixinUserInfo', result)
+                    if (result.errcode) {
+                        res.json({ success: false, ...result })
+                    } else {
+                        console.log(result, 333)
+                        const { openid, unionid, subscribe, ...userInfo } = result
+                        knex('weixin_user').select().where({ openid: result.openid }).then(row => {
+                            if (row.length <= 0) {
+                                knex('weixin_user').insert({
+                                    openid,
+                                    userInfo: JSON.stringify(userInfo),
+                                    createDate: moment().format('YYYY-MM-DD'),
+                                    createTime: moment().format('HH:mm:ss'),
+                                    unionid,
+                                    subscribe
+                                }).then(rows => {
+                                    console.log(rows)
+                                })
+                            }
+                        })
+                        const token = jwt.sign({ openid }, PRIVATE_KEY);
+                        res.json({ success: true, message: '获取微信用户信息成功', token, userInfo })
+                    }
+                })
+            } else {
+                res.json(tokenData);
+            }
         }).catch(err => {
             console.log('getWeixinUserInfo222', err)
         })
@@ -84,5 +141,6 @@ function getWeixinUserInfo(knex) {
 module.exports = {
     weixinAuth,
     getPageToken,
-    getWeixinUserInfo
+    getWeixinUserInfo,
+    getToken
 };

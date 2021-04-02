@@ -1,8 +1,8 @@
 var createError = require('http-errors');
 var express = require('express');
-var path = require('path');
 const cors = require('cors');
 const { checkLogin } = require('./utils/jwt');
+const { getToken } = require('./routes/weixin');
 
 
 var app = express();
