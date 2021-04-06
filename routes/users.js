@@ -1,8 +1,10 @@
+const express = require('express');
+const router = express.Router();
 const { varifyToken } = require('../utils/jwt');
 
 // 获取用户信息
 function user(knex) {
-  return function(req, res, next) {
+  router.get('/user', function(req, res, next) {
     const token = req.get('Authorization');
     const obj = varifyToken(token);
     knex('user').select().where({ username: obj.name }).then(data => {
@@ -13,7 +15,8 @@ function user(knex) {
         res.json({ success: false, message: '获取不到用户信息' });
       }
     })
-  }
+  })
+  return router;
 }
 
 module.exports = {

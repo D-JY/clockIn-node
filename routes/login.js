@@ -1,10 +1,12 @@
+const express = require('express');
+const router = express.Router();
 const moment = require('moment');
 const { createToken } = require('../utils/jwt');
-const { PRIVATE_KEY, JWT_EXPIRED } = require('../utils/const');
 
-// 注册
-function register(knex) {
-    return function(req, res, next) {
+// 登录、注册
+function login(knex) {
+
+    router.get('/register', function(req, res, next) {
         const { name, password } = req.body;
         knex('user').insert({
             username: name,
@@ -17,12 +19,9 @@ function register(knex) {
             console.log(data.Result, 11)
         })
         res.json({token: 'abcd123123', body: req.body, query: req.query});
-    }
-}
+    })
 
-// 登录
-function login(knex) {
-    return function(req, res, next) {
+    router.post('/login', function(req, res, next) {
         const { name, password } = req.body;
         knex('user').select().where({ username: name }).then(data => {
             if (data) {
@@ -38,7 +37,8 @@ function login(knex) {
                 res.json({ message: '该账号未注册', success: false })
             }
         })
-    }
+    })
+    return router
 }
 
 module.exports = {

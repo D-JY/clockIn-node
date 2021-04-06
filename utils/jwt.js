@@ -13,14 +13,14 @@ function createToken (data) {
 
 // 校验token
 function checkLogin(req, res, next) {
-    // if (WHITE_LIST.includes(req._parsedUrl.pathname)) {
-    //     next();
-    //     return;
-    // }
-    if (WHITE_LIST.some(val => !!~req._parsedUrl.pathname.indexOf(val))) {
+    if (WHITE_LIST.includes(req._parsedUrl.pathname)) {
         next();
         return;
     }
+    // if (WHITE_LIST.some(val => !!~req._parsedUrl.pathname.indexOf(val))) {
+    //     next();
+    //     return;
+    // }
     const token = req.get('Authorization');
     const obj = varifyToken(token);
     if (obj) {
@@ -34,11 +34,15 @@ function checkLogin(req, res, next) {
 function varifyToken(token) {
     try {
         let { data, ctime, expiresIn } = jwt.verify(token, PRIVATE_KEY);
-        let nowTime = (new Date()).getTime();
-        if (nowTime - ctime < expiresIn) {
-            return data;
+        if (ctime && expiresIn) {
+            let nowTime = (new Date()).getTime();
+            if (nowTime - ctime < expiresIn) {
+                return data;
+            } else {
+                return void 0;
+            }
         } else {
-            return void 0;
+            return data;
         }
     } catch(error) {
         return void 0;

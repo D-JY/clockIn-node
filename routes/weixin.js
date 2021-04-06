@@ -1,15 +1,16 @@
-var crypto = require('crypto');
+const express = require('express');
+const router = express.Router();
+const crypto = require('crypto');
 const { WEIXIN_TOKEN, appID, appsecret, PRIVATE_KEY } = require('../utils/const');
-let http = require('request');
+const http = require('request');
 const moment = require('moment');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
-var path = require('path');
+const path = require('path');
 
 // 微信配置URL认证
 function weixinAuth(knex) {
     return function(req, res, next) {
-        console.log(123123)
         const { signature, timestamp, nonce, echostr } = req.query;
         // 1. 将token、timestamp、nonce三个参数进行字典序排序
         let array = new Array(WEIXIN_TOKEN, timestamp, nonce);
@@ -102,10 +103,10 @@ function getWeixinUserInfo(knex) {
             const tokenData = await getToken();
             console.log(tokenData, 'tokenData');
             if (tokenData.access_token) {
-                const url = `https://api.weixin.qq.com/sns/userinfo?access_token=${tokenData.access_token}&openid=${body.openid}&lang=zh_CN`;
+                const url = `https://api.weixin.qq.com/cgi-bin/user/info?access_token=${tokenData.access_token}&openid=${body.openid}&lang=zh_CN`;
                 http.get(url, function(err, data, result) {
                     result = JSON.parse(result)
-                    console.log('getWeixinUserInfo', result)
+                    console.log('getWeixinUserInfo', result, url)
                     if (result.errcode) {
                         res.json({ success: false, ...result })
                     } else {
@@ -125,7 +126,7 @@ function getWeixinUserInfo(knex) {
                                 })
                             }
                         })
-                        const token = jwt.sign({ openid }, PRIVATE_KEY);
+                        const token = jwt.sign({ data: { openid } }, PRIVATE_KEY);
                         res.json({ success: true, message: '获取微信用户信息成功', token, userInfo })
                     }
                 })
@@ -133,14 +134,23 @@ function getWeixinUserInfo(knex) {
                 res.json(tokenData);
             }
         }).catch(err => {
-            console.log('getWeixinUserInfo222', err)
+            res.json({ success: false, message: '获取openid失败', ...err });
         })
     }
+}
+
+function weixin(knex) {
+    // 微信后台URL配置
+    router.use('/verify', weixinAuth(knex));
+    // 获取微信用户信息
+    router.get('/getWeixinUserInfo', getWeixinUserInfo(knex));
+    return router;
 }
 
 module.exports = {
     weixinAuth,
     getPageToken,
     getWeixinUserInfo,
-    getToken
+    getToken,
+    weixin
 };

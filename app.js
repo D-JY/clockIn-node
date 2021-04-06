@@ -24,13 +24,15 @@ app.use(express.json());
 
 app.use(cors()); // 注入cors模块解决跨域
 
-app.use(checkLogin); // 校验token
+// PC端接口
+app.use('/api', checkLogin); // 校验token
+app.use('/api', require('./routes/login').login(knex));
+app.use('/api', require('./routes/users').user(knex));
 
-app.post('/weixin', require('./routes/weixin').weixinAuth(knex));
-app.get('/weixinApi/getWeixinUserInfo', require('./routes/weixin').getWeixinUserInfo(knex));
-
-app.post('/api/login', require('./routes/login').login(knex));
-app.get('/api/user', require('./routes/users').user(knex));
+// 微信端接口
+app.use('/weixin', checkLogin); // 检查是否带有openid
+app.use('/weixin', require('./routes/weixin').weixin(knex));
+app.use('/weixin', require('./routes/weixinApi').weixinApi(knex));
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
