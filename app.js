@@ -32,7 +32,6 @@ app.use('/api', require('./routes/users').user(knex));
 // 微信端接口
 app.use('/weixin', checkLogin); // 检查是否带有openid
 app.use('/weixin', require('./routes/weixin').weixin(knex));
-app.use('/weixin', require('./routes/weixinApi').weixinApi(knex));
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const { WEIXIN_TOKEN, appID, appsecret, PRIVATE_KEY } = require('../utils/const');
+const { WEIXIN_TOKEN, appID, appsecret, PRIVATE_KEY, templateId_clockIn } = require('../utils/const');
 const http = require('request');
 const moment = require('moment');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
+const { varifyToken } = require('../utils/jwt');
 
 // 微信配置URL认证
 function weixinAuth(knex) {
@@ -139,11 +140,64 @@ function getWeixinUserInfo(knex) {
     }
 }
 
+
 function weixin(knex) {
     // 微信后台URL配置
     router.use('/verify', weixinAuth(knex));
     // 获取微信用户信息
     router.get('/getWeixinUserInfo', getWeixinUserInfo(knex));
+    // 获取除自己关注公众号用户
+    router.get('/userList', function(req, res, next) {
+        const token = req.get('Authorization');
+        const { openid } = varifyToken(token);
+        knex('weixin_user').select().whereNot('openid', openid).where('subscribe', 1).then(data => {
+            const result = data.map(val => {
+                const userInfo = JSON.parse(val.userInfo);
+                return { id: val.id, name: userInfo.nickname }
+            })
+            res.json({ success: true, message: '获取接收人列表成功', data: result });
+        })
+    })
+    // 发送模板消息
+    router.post('/sendWeiXinMsg', async function(req, res, next) {
+        const { id, notice } = req.body;
+        const { access_token } = await getToken();
+        const url = `https://api.weixin.qq.com/cgi-bin/message/template/send?access_token=${access_token}`;
+        const token = req.get('Authorization');
+        const { openid } = varifyToken(token);
+        knex('weixin_user').select('userInfo').where('openid', openid)
+            .then(data => JSON.parse(data[0].userInfo))
+            .then(userInfo => {
+                return knex('weixin_user').select('openid').where('id', id)
+                    .then(data => ({ openid: data[0].openid, name: userInfo.nickname }))
+            })
+            .then(data => {
+                http({
+                    url,
+                    method: 'POST',
+                    body: JSON.stringify({
+                        touser: data.openid,
+                        template_id: templateId_clockIn,
+                        data: {
+                            first: {
+                                value: `${data.name}给您发送消息！`,
+                                color: '#173177'
+                            },
+                            notice: {
+                                value: notice
+                            }
+                        }
+                    })
+                }, function(err, data, body) {
+                    body = JSON.parse(body);
+                    if (!body.errcode) {
+                        res.json({ success: true, message: '发送成功' });
+                    } else {
+                        res.json({ success: false, message: '发送失败', ...body });
+                    }
+                })
+            })
+    })
     return router;
 }
 
