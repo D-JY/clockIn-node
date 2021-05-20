@@ -198,6 +198,24 @@ function weixin(knex) {
                 })
             })
     })
+    // 创建自定义菜单
+    router.post('/createMenu', async function(req, res, next) {
+        const { access_token } = await getToken();
+        const url = `https://api.weixin.qq.com/cgi-bin/menu/create?access_token=${access_token}`;
+        const { data } = req.body;
+        http({
+            url,
+            method: 'POST',
+            data: JSON.stringify(data)
+        }, function(err, data, body) {
+            body = JSON.parse(body);
+            if (!body.errcode) {
+                res.json({ success: true, message: '创建成功' });
+            } else {
+                res.json({ success: false, message: '创建失败', ...body });
+            }
+        })
+    })
     return router;
 }
 

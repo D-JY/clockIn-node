@@ -19,12 +19,12 @@ function user(knex) {
   })
   // 获取后台用户列表
   router.get('/userList', function(req, res, next) {
-    const { name: username, role } = req.query;
+    const { name: username, role, page, pageSize } = req.query;
     let where = {};
     if (username) where['username'] = username;
     if (role) where['role'] = role;
     const count = knex('user').select().where(where).count('id').first();
-    const row = knex('user').select().where(where);
+    const row = knex('user').select().where(where).offset(page <= 1 ? 0 : (page - 1) * pageSize).limit(pageSize);
     Promise.all([count, row]).then(([total, data]) => {
       res.json({ success: true, message: '获取用户列表成功', data: data.map(val => {
         const { id, username, registerDate, registerTime, role } = val;
@@ -61,6 +61,38 @@ function user(knex) {
     }).catch(() => {
       res.json({ success: false, message: '删除失败' });
     })
+  })
+  // 修改用户信息
+  router.post('/updateUser', function(req, res, next) {
+    const { id, name: username, role, password } = req.body;
+    let params = { username, role };
+    if (password) {
+      params['password'] = password
+    }
+    knex('user').select('id').where('username', username).then(rows => {
+      if (rows.length) {
+        res.json({ success: false, message: '已存在该用户名' });
+      } else {
+        knex('user').where('id', id).update(params).then(data => {
+          res.json({ success: true, message: '修改成功' });
+        }).catch((err) => {
+          console.error(err);
+          res.json({ success: false, message: '修改失败' });
+        })
+      }
+    })
+  })
+  // 获取微信列表
+  router.get('/getWeixinUserList', function(req, res, next) {
+    const { page, pageSize } = req.query;
+    const count = knex('weixin_user').select().where('subscribe', 1).count('id').first();
+    const row = knex('weixin_user').select().where('subscribe', 1).offset(page <= 1 ? 0 : (page - 1) * pageSize).limit(pageSize);
+    Promise.all([count, row]).then(([total, data]) => {
+      res.json({ success: true, message: '获取微信用户列表成功', data: data.map(val => {
+        const { openid, ...allData } = val;
+        return { ...allData }
+      }), ...total });
+    }).catch(() => res.json({ success: false, message: '获取微信用户列表失败' }))
   })
   return router;
 }
